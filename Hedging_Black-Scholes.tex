@@ -1,0 +1,96 @@
+\documentclass[12pt]{article}
+\usepackage{graphicx}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{eulervm}
+\usepackage[a4paper, margin=2cm]{geometry}
+
+% Macros
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\prob}{\mathbb{P}}
+\newcommand{\f}{\mathcal{F}}
+\newcommand{\norm}{\mathcal{N}}
+\newcommand{\n}{\mathbb{N}}
+
+\renewcommand{\labelitemi}{--}
+\setlength{\parindent}{0pt}
+
+\title{Stratégie de couverture d'options dans le modèle de Black-Scholes}
+\author{Maxence Caucheteux}
+\date{30 mai 2025}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+Je reviens dans ce document sur quelques subtilités du pricing et du hedging d'options. Pour simplifier, on se placera dans le modèle de Black-Scholes sur un intervalle de temps $[0,T]$. 
+
+On se donne donc un mouvement brownien $(B_t)_{0 \leq t \leq T}$ de filtration $(\f_t)_{0 \leq t\leq T}$ défini sur un espace de probabilités $(\Omega, \f, \prob)$. On considère un marché qui comporte un actif sans risque $S^0_t = e^{rt}$ et un actif risqué de prix $S_t$ dont l'évolution est régie par l'EDS
+$$dS_t = S_t (\mu dt + \sigma dB_t), \ \ S_0=s_0$$
+avec $\sigma > 0$ la volatilité, $\mu \in \mathbb{R}$ le rendement et $s_0$ le cours initial de l'actif risqué. On notera comme il est d'usage $\prob^*$ la probabilité martingale équivalente, i.e. la probabilité de densité $\exp\left(-\frac{\mu-r}{\sigma}B_T-(\frac{\mu-r}{\sigma})^2T\right)$ sous laquelle $W_t = B_t + \frac{\mu-r}{\sigma}t$ est une $\prob^*$-martingale.
+
+\section{Stratégie de couverture}
+Dans le modèle de Black-Scholes, le théorème de représentation des martingales browniennes permet de montrer que toute option $h$ positive, $\f_T$-mesurable et de carré intégrable sous $\prob^*$ est simulable et que la valeur de tout portefeuille simulant est donnée par 
+$$V_t = \E^*(e^{-r(T-t)}h \ | \ \f_t)$$
+Cette valeur définit naturellement le prix de l'option à l'instant $t$. 
+
+Dans le cas d'une option vanille $h=\varphi(S_T)$, on peut même montrer que le prix de l'option s'écrit $V_t=F(t, S_t)$ où $F$ est donnée par :
+$$F(t,x) = e^{-r(T-t)}\int_{-\infty}^{+\infty} f\left( xe^{(r-\sigma^2/2)(T-t) + \sigma y \sqrt{T-t}} \right) \frac{e^{-y^2/2}}{\sqrt{2\pi}}dy$$
+On peut montrer que le portefeuille de couverture est composé d'une quantité $H_t = \frac{\partial F}{\partial x}(t, S_t)$ d'actif risqué et donc d'une quantité $H^0_t = \tilde{V}_t - H_t\tilde{S}_t$ d'actif sans risque est un portefeuille simulant cette option.
+
+Dans le modèle de Black-Scholes, on dispose toujours d'un portefeuille de couverture, mais ce qu'on va dire dans la suite fonctionne aussi si on dispose uniquement d'un portefeuille de couverture.
+
+\section{Discrétisation}
+Sur le marché, les cours ne sont pas actualisés en temps continu. Ils sont certes actualisés très souvent, mais pas en temps continu. Mathématiquement, pour simuler un cours, on discrétise l'EDS de Black-Scholes via le cours d'un pas de temps $\Delta t = T/N$. On a ainsi accès à des valeurs du cours aux instants $t_k=kT/N$.
+
+\subsection{Simulation d'une trajectoire}
+On peut montrer que la solution forte $(S_t)_{t \leq T}$ de l'EDS de Black-Scholes est donnée par
+$$S_t = s_0\exp\left((\mu-\sigma^2/2)t+\sigma B_t\right)$$
+Par conséquent, on a $\forall 0 \leq s \leq t \leq T$
+$$S_t = S_s \exp\left( (\mu-\sigma^2/2)(T-t)+\sigma (B_t -B_s) \right)$$
+Ainsi, on simulera une trajectoire via la formule
+$$S_{t_{k+1}} = S_{t_k} \exp\left( (\mu-\sigma^2/2)\Delta t+\sigma (B_{t_{k+1}} -B_{t_k}) \right), \ \ S_0=s_0$$
+Ce qui est facile puisque $B_{t_{k+1}} -B_{t_k} \sim \norm(0, \Delta t)$.
+
+\subsection{Couverture effective}
+
+De la même façon que le cours $S_t$ ne saurait être actualisé en temps continu, on ne peut pas non plus faire évoluer en temps continu un portefeuille de couverture en pratique. À la place, on va actualiser notre portefeuille de couverture à chaque instant $t_k$ connaissant le cours $S_{t_k}$ et sur $[t_k, t_{k+1}]$ on n'y touchera pas. Pour l'actualisation, on procède de la façon suivante :
+\begin{itemize}
+    \item À l'instant initial $t_0=0$, on constitue à partir de la prime $V_0$ que l'acheteur de l'option nous a versée un portefeuille autofinancé constitué de $H^0_0$ actif sans risque et $H_0$ actif risqué. On a forcément assez d'argent pour le faire puisque la prime $V_0$ a été calculée de sorte qu'on puisse le faire ($V_0=H^0_0+H_0 s_0$).
+    \item Ensuite, à un instant $t_k$ donné, le cours est passé de $S_{t_{k-1}}$ à $S_{t_k}$ entre $t_{k-1}$ et $t_k$. À $t_{k-1}$ notre portefeuille avait un certain montant en actif sans risque. Cette valeur est multipliée par $e^{r \Delta t}$ à $t_k$. Cela revient à un placement au taux continu $r$ entre $t_k$ et $t_{k-1}$.
+    \item On modifie notre quantité d'actif risqué en choisissant à $t_k$ la quantité $H_{t_k}$ d'actif risqué.
+    \item On ajuste ensuite la valeur d'actif sans risque pour que le portefeuille reste autofinancé (i.e. on n'introduit pas d'argent en plus). En l'occurrence, ce qu'on avait en actif risqué à $t_k$ avant actualisation est passé d'une valeur de $H_{t_{k-1}}S_{t_k}$ à une valeur de $H_{t_k} S_{t_k}$. Il faut donc retrancher $(H_{t_k}-H_{t_{k-1}})S_{t_k}$ à la valeur que l'on possède en actif sans risque (i.e. ce qu'on a en banque).
+\end{itemize}
+Au cours du temps, il se peut que $H^0_t$ devienne négatif. Cela signifie qu'on emprunte au taux $r$ pour pouvoir investir dans une quantité $H_t$ d'actif risqué. Cela ne viole pas l'autofinancement.
+
+Ainsi, comme du fait de la discrétisation, la couverture n'est pas parfaite. Elle est approchée. Il serait pertinent de mesurer la qualité de cette couverture. On se doute bien qu'elle sera meilleure plus le nombre de pas de temps $N$ sera grand.  
+
+\section{Probabilité historique et probabilité risque neutre}
+\subsection{Simulation}
+Sur le marché, on observe un cours $S_t$ d'un certain actif. On modélise mathématiquement ce cours via l'EDS de Black-Scholes, dont la solution est un processus $(S_t)_{t \leq T}$ défini sur un certain espace de probabilité filtré $(\Omega, \f, (\f_t), \prob)$. La probabilité $\prob$ est appelée probabilité historique et c'est une probabilité qui est supposée modéliser le monde tel qu'il l'est vraiment. Ainsi, sous $\prob$, le processus $S_t$ a une certaine loi et c'est selon cette loi que l'on simule des trajectoires. \\
+
+\subsection{Risque résiduel}
+On a construit notre portefeuille de couverture pour que $V_T = h$. Mais en pratique, notre portefeuille n'est pas de valeur $V_t$, mais de valeur $V_t^{\text{approx}}$ du fait de la discrétisation. \\
+
+On a donc un risque résiduel $R$ à l'échéance qui est donné par :
+$$R = h-V_T^{\text{approx}}$$
+L'autofinancement permet d'écrire que :
+$$\tilde{V}_{t_{k+1}}-\tilde{V}_{t_{k}} = H_{t_k} (\tilde{S}_{t_{k+1}} - \tilde{S}_{t_k})$$
+Et que par conséquent :
+$$R = he^{-rT} - \tilde{V}_0 - \sum_{k=0}^{N-1} H_{t_k}(\tilde{S}_{t_{k+1}} - \tilde{S}_{t_k})$$
+On sait que 
+$$\sum_{k=0}^{N-1} H_{t_k}(S_{t_{k+1}} - S_{t_k}) \xrightarrow[n \infty]{\prob^*} \int_0^T H_t d\tilde{S}_t$$
+Et par conséquent quand $N$ est grand (i.e. quand le pas de temps est petit), et puisque par autofinancement $\tilde{V}_T = \tilde{V}_0 + \int_0^T H_t d\tilde{S}_t$, on a envie de dire que le risque résiduel "s'approche" de $0$.
+
+\section{Conclusion}
+Lorsqu'on fait du hedging, on n'a pas une couverture parfaite en général. On a seulement une couverture approchée, même lorsque la couverture est en théorie parfaite, comme c'est le cas dans le cadre du delta-hedging de Black-Scholes.
+
+En pratique, il faut faire attention de bien vérifier la condition d'autofinancement lorsqu'on actualise notre portefeuille.
+
+
+
+
+
+\end{document}
